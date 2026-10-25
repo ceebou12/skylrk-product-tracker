@@ -2,39 +2,47 @@
 from bs4 import BeautifulSoup
 import requests
 from database import save_products
+from database import get_status
 
 url = 'https://skylrk.com/'
 
 page = requests.get(url, timeout=10)
 page.raise_for_status()
 
-soup = BeautifulSoup(page.text, "html.parser") # parses the html
+#parses the html
+soup = BeautifulSoup(page.text, "html.parser") 
 
 
 products = []
 
-for element in soup.find_all(class_= "floating-product-grid__item"):
+#find everything with this class
+for element in soup.find_all(class_= "floating-product-grid__item"): 
 	
-	imgLink_element = element.find("img", attrs={"src": True}) #finds image tag that has src attribute
+	#finds image tag that has src attribute (image link) and stores the result
+	imgLink_element = element.find("img", attrs={"src": True})
 	imgLink = imgLink_element["src"]
 
-
-	label_element = element.find(attrs={"aria-label": True})
+	#find aria-label (item name and status) attribute inside the class and store result
+	label_element = element.find(attrs={"aria-label": True}) 
 	label = label_element["aria-label"]
 
-
+	#checks if a element (item link) exists and stores it appropriatly
 	link_element = element.find("a")
 	if link_element != None:
 		link = link_element["href"]
 	else:
 		link = None
 
+	#seperates the item name and status, appends everything to products
+	if link != None and link.startswith("/products/"):
+		full_url = "https://skylrk.com" + link
 
-	if "Sold out" in label:
-		name = label.replace(" — Sold out", "")
-		products.append([name, "Sold out", link, imgLink]) 
+		result = get_status(full_url)
 
-
+		if result != None:
+			products.extend(result)
+		
+	#finds when link exists and finishes url 
 	elif label.startswith("View "):
 		name = label.replace("View ", "", 1)
 		
@@ -43,13 +51,11 @@ for element in soup.find_all(class_= "floating-product-grid__item"):
 		else:
 			full_url = None
 
-
-		products.append([name, "Listed", full_url, imgLink])
+		if full_url != None:
+			result = (get_status(full_url))
+			if result != None:
+				products.extend(result)
 		
-	
-#for name, status, link, imgLink in products:
-	#print(name, "-", status, "-", link, "-", imgLink)
-
 save_products(products)
 
 
